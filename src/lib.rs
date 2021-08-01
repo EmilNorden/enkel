@@ -14,7 +14,7 @@ use sdl2::pixels::Color;
 use sdl2::render::WindowCanvas;
 use crate::graphics::GraphicsContext;
 use crate::font_loader::FontLoader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Copy, Clone)]
 pub struct GameTime {
@@ -46,6 +46,10 @@ impl GameTime {
     pub fn frame_millis(&self) -> f32 {
         self.frame_millis
     }
+}
+
+pub trait Newable {
+    fn new() -> Self;
 }
 
 pub trait Game {
@@ -112,15 +116,44 @@ pub struct GameHost {
     game: Box<dyn Game>
 }
 
-
-pub fn create<G: Game, P: AsRef<Path>>(name: &str, base_content_path: P, game: Box<dyn Game>) -> Result<GameHost, String> {
-    let context = GameContext::create(name, base_content_path)?;
-
-    Ok(GameHost {
-        context,
-        game
-    })
+pub struct GameHostBuilder {
+    base_content_path: PathBuf,
+    game_name: String,
 }
+
+impl GameHostBuilder {
+    pub fn new() -> Self {
+        GameHostBuilder
+        {
+            base_content_path: "/".parse().unwrap(),
+            game_name: "My Game!".to_string()
+        }
+    }
+
+    pub fn with_name(&mut self, name: &str) -> &mut Self {
+        self.game_name = name.to_owned();
+        self
+    }
+
+    pub fn with_content_path<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        self.base_content_path = path.as_ref().into();
+        self
+    }
+
+    pub fn build<G: 'static + Game + Newable>(&self) -> Result<GameHost, String> {
+        let context = GameContext::create(&self.game_name, self.base_content_path.as_path())?;
+
+        Ok(GameHost {
+            context,
+            game: Box::new(G::new())
+        })
+    }
+}
+
+
+/*pub fn create<G: Game, P: AsRef<Path>>(name: &str, base_content_path: P, game: Box<dyn Game>) -> Result<GameHost, String> {
+
+}*/
 
 impl GameHost {
 
