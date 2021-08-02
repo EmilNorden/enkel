@@ -1,12 +1,12 @@
-mod graphics;
+pub mod game_time;
 pub mod font;
 mod content_loader;
 mod font_loader;
+mod graphics;
 mod text;
 
 use sdl2::Sdl;
 use sdl2::event::Event;
-use std::time::{Instant, Duration};
 use sdl2::video::{Window, GLContext};
 use sdl2::ttf::{InitError, Sdl2TtfContext};
 use std::io::Error;
@@ -15,44 +15,15 @@ use sdl2::render::WindowCanvas;
 use crate::graphics::GraphicsContext;
 use crate::font_loader::FontLoader;
 use std::path::{Path, PathBuf};
-
-#[derive(Copy, Clone)]
-pub struct GameTime {
-    game_duration: Duration,
-    frame_duration: Duration,
-    frame_millis: f32,
-}
-
-impl GameTime {
-    pub fn new(game_duration: Duration, frame_duration: Duration) -> Self {
-        let frame_millis: f32 = frame_duration.as_micros() as f32;
-        GameTime {
-            game_duration,
-            frame_duration,
-            frame_millis,
-        }
-    }
-}
-
-impl GameTime {
-    pub fn game_duration(&self) -> Duration {
-        self.game_duration
-    }
-
-    pub fn frame_duration(&self) -> Duration {
-        self.frame_duration
-    }
-
-    pub fn frame_millis(&self) -> f32 {
-        self.frame_millis
-    }
-}
+use crate::game_time::GameTime;
+use std::time::Instant;
 
 pub trait Newable {
     fn new() -> Self;
 }
 
 pub trait Game {
+    fn load_content(&mut self, context: &mut GameContext);
     fn update(&mut self, context: &mut GameContext, time: GameTime);
     fn draw(&self, context: &mut GameContext, time: GameTime);
 }
@@ -113,7 +84,6 @@ impl GameContext {
 
 pub struct GameHost {
     context: GameContext,
-    game: Box<dyn Game>
 }
 
 pub struct GameHostBuilder {
@@ -140,24 +110,22 @@ impl GameHostBuilder {
         self
     }
 
-    pub fn build<G: 'static + Game + Newable>(&self) -> Result<GameHost, String> {
+    pub fn build(&self) -> Result<GameHost, String> {
         let context = GameContext::create(&self.game_name, self.base_content_path.as_path())?;
 
         Ok(GameHost {
             context,
-            game: Box::new(G::new())
         })
     }
 }
 
-
-/*pub fn create<G: Game, P: AsRef<Path>>(name: &str, base_content_path: P, game: Box<dyn Game>) -> Result<GameHost, String> {
-
-}*/
-
 impl GameHost {
 
-    pub fn run(&mut self) {
+    pub fn run<G: 'static + Game + Newable>(&mut self) {
+
+        let mut game = G::new();
+        game.load_content(&mut self.context);
+
         let mut events = self.context.sdl.event_pump().unwrap();
         let game_timer = Instant::now();
         let mut frame_timer = Instant::now();
@@ -173,8 +141,8 @@ impl GameHost {
 
             let game_time = GameTime::new(game_timer.elapsed(), frame_timer.elapsed());
             frame_timer = Instant::now();
-            self.game.update(&mut self.context, game_time);
-            self.game.draw(&mut self.context, game_time);
+            game.update(&mut self.context, game_time);
+            game.draw(&mut self.context, game_time);
             self.context.graphics.present();
         }
     }
