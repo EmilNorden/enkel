@@ -1,5 +1,4 @@
 use std::path::Path;
-use crate::font::Font;
 
 struct ContentLoader {
     base_path: Box<Path>,
