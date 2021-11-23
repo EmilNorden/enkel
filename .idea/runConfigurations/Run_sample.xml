@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Run sample" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run --package enkel-consumer --bin enkel-consumer" />
+    <option name="command" value="run" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$/samples/simple" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />

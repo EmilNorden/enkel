@@ -18,7 +18,6 @@ impl Game for MyGame {
         } else {
             // context.graphics_mut().set_clear_color(glm::vec3(0.0, 0.0, 1.0));
         }
-
     }
 
     fn draw(&self, context: &mut GameContext, time: GameTime) {

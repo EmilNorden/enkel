@@ -14,6 +14,7 @@ use winit::event::{Event, WindowEvent, ElementState, VirtualKeyCode, KeyboardInp
 use wgpu::util::DeviceExt;
 use crate::texture::Texture;
 use cgmath::{Rotation3, Zero, InnerSpace};
+use crate::model::{Model, Vertex};
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
 const NUM_INSTANCES: u32 = NUM_INSTANCES_PER_ROW * NUM_INSTANCES_PER_ROW;
@@ -92,42 +93,6 @@ impl Uniforms {
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-}
-
-impl Vertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                }
-            ],
-        }
-    }
-}
-
-const VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614] }, // A
-    Vertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354] }, // B
-    Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397057] }, // C
-    Vertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.84732911] }, // D
-    Vertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.2652641] }, // E
-];
-
 const INDICES: &[u16] = &[
     0, 1, 4,
     1, 2, 4,
@@ -143,10 +108,10 @@ struct State {
     swap_chain: wgpu::SwapChain,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
+    /*vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_vertices: u32,
-    num_indices: u32,
+    num_indices: u32,*/
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
     camera: Camera,
@@ -441,7 +406,7 @@ impl State {
                 module: &shader,
                 entry_point: "main",
                 buffers: &[
-                    Vertex::desc(),
+                    model::ModelVertex::desc(),
                     InstanceRaw::desc(),
                 ],
             },
@@ -480,15 +445,15 @@ impl State {
             },
         });
 
-        let vertex_buffer = device.create_buffer_init(
+        /*let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
                 contents: bytemuck::cast_slice(VERTICES),
                 usage: wgpu::BufferUsage::VERTEX,
             }
-        );
+        );*/
 
-        let index_buffer = device.create_buffer_init(
+        /*let index_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Index Buffer"),
                 contents: bytemuck::cast_slice(INDICES),
@@ -497,7 +462,7 @@ impl State {
         );
         let num_vertices = VERTICES.len() as u32;
         let num_indices = INDICES.len() as u32;
-
+*/
         let camera_controller = CameraController::new(0.2);
 
         let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
@@ -526,6 +491,8 @@ impl State {
             }
         );
 
+        let m = Model::load(&device, &queue, &uniform_bind_group_layout, "/home/emil/models/apple/apple.obj");
+
         Self {
             surface,
             device,
@@ -534,10 +501,10 @@ impl State {
             swap_chain,
             size,
             render_pipeline,
-            vertex_buffer,
+            /*vertex_buffer,
             num_vertices,
             index_buffer,
-            num_indices,
+            num_indices,*/
             diffuse_bind_group,
             diffuse_texture,
             camera,
@@ -610,10 +577,10 @@ impl State {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            //render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
+            // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
 
