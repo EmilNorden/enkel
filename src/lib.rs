@@ -108,7 +108,7 @@ struct State {
     swap_chain: wgpu::SwapChain,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    model: Model,
+    // model: Model,
     /*vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_vertices: u32,
@@ -495,8 +495,7 @@ impl State {
             }
         );
 
-        let model = Model::load(&device, &queue, &texture_bind_group_layout, "/home/emil/models/cube/cube.obj").unwrap();
-
+        //let model = Model::load(&device, &queue, &texture_bind_group_layout, "/home/emil/models/cube/cube.obj").unwrap();
 
         Self {
             surface,
@@ -506,7 +505,7 @@ impl State {
             swap_chain,
             size,
             render_pipeline,
-            model,
+            //model,
             /*vertex_buffer,
             num_vertices,
             index_buffer,
@@ -589,9 +588,9 @@ impl State {
             // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
 
             use model::DrawModel;
-            let mesh = &self.model.meshes[0];
-            let material = &self.model.materials[mesh.material];
-            render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32);
+            // let mesh = &self.model.meshes[0];
+            // let material = &self.model.materials[mesh.material];
+            // render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
 

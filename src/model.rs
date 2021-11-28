@@ -1,3 +1,5 @@
+mod assimp_loader;
+
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::Path;
@@ -55,10 +57,29 @@ pub struct Model {
     pub materials: Vec<Material>,
 }
 
+impl Model {
+    pub fn new(meshes: Vec<Mesh>, materials: Vec<Material>) -> Self {
+        Self {
+            meshes,
+            materials
+        }
+    }
+}
+
 pub struct Material {
     pub name: String,
     pub diffuse_texture: texture::Texture,
     pub bind_group: wgpu::BindGroup,
+}
+
+impl Material {
+    pub fn new(name: String, diffuse_texture: texture::Texture, bind_group: wgpu::BindGroup) -> Self {
+        Self {
+            name,
+            diffuse_texture,
+            bind_group
+        }
+    }
 }
 
 pub struct Mesh {
@@ -69,136 +90,15 @@ pub struct Mesh {
     pub material: usize,
 }
 
-
-impl Model {
-    pub fn load<P: AsRef<Path>>(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
-        path: P,
-    ) -> Result<Model> {
-        /*let scene = russimp::scene::Scene::from_file(path.as_ref().to_str().unwrap(), vec![
-
-            PostProcess::CalculateTangentSpace, PostProcess::Triangulate,
-            PostProcess::GenerateSmoothNormals, PostProcess::ImproveCacheLocality,
-            PostProcess::RemoveRedundantMaterials, PostProcess::OptimizeMeshes,
-            PostProcess::FixInfacingNormals, PostProcess::FixOrRemoveInvalidData,
-            PostProcess::OptimizeGraph, PostProcess::JoinIdenticalVertices,
-            PostProcess::FindInstances, PostProcess::GenerateUVCoords, PostProcess::SortByPrimitiveType,
-        ]).expect("Unable to read file");*/
-
-        let scene = russimp::scene::Scene::from_file(path.as_ref().to_str().unwrap(), vec![
-            PostProcess::RemoveRedundantMaterials,
-            PostProcess::CalculateTangentSpace, PostProcess::Triangulate,
-            PostProcess::FindInstances, PostProcess::GenerateUVCoords, PostProcess::SortByPrimitiveType,
-        ]).expect("Unable to read file");
-
-        let parent_folder = path.as_ref()
-            .parent()
-            .context("Directory has no parent")?;
-
-        let mut materials = Vec::new();
-        for (i, mat) in scene.materials.into_iter().enumerate(){
-            materials.push(Model::create_material(device, queue, layout,mat, parent_folder)?);
-        }
-
-        let mut meshes = Vec::new();
-        for mesh in scene.meshes {
-            meshes.push(Self::create_mesh(device, mesh)?);
-        }
-
-        Ok(Model {
-            meshes,
-            materials
-        })
-    }
-
-    fn create_mesh(device: &Device, ai_mesh: russimp::mesh::Mesh) -> Result<Mesh> {
-
-        let texture_coords = ai_mesh.texture_coords[0].as_ref().unwrap();
-
-        let mut vertices = Vec::with_capacity(ai_mesh.vertices.len());
-        for i in 0..ai_mesh.vertices.len() {
-            vertices.push(ModelVertex {
-                position: [ai_mesh.vertices[i].x, ai_mesh.vertices[i].y, ai_mesh.vertices[i].z],
-                tex_coords: [texture_coords[i].x, texture_coords[i].y],
-                normal: [ai_mesh.normals[i].x, ai_mesh.normals[i].y, ai_mesh.normals[i].z],
-            });
-        }
-
-        let vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Vertex Buffer", ai_mesh.name)),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsage::VERTEX,
-            }
-        );
-
-        // Since we specify PostProcess::Triangulate when loading the model, we can safely assume 3 indices per face
-        let mut indices = Vec::with_capacity(ai_mesh.faces.len() * 3);
-        for face in &ai_mesh.faces {
-            for i in &face.0 {
-                indices.push(*i);
-            }
-        }
-
-        let index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Index Buffer", ai_mesh.name)),
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsage::INDEX,
-            }
-        );
-
-        Ok(Mesh {
-            name: ai_mesh.name,
+impl Mesh {
+    pub fn new(name: String, vertex_buffer: wgpu::Buffer, index_buffer: wgpu::Buffer, num_elements: u32, material: usize) -> Self {
+        Mesh {
+            name,
             vertex_buffer,
             index_buffer,
-
-            num_elements: ai_mesh.faces.len() as u32 * 3,
-            material: ai_mesh.material_index as usize,
-        })
-    }
-
-    fn create_material(device: &Device, queue: &Queue, layout: &wgpu::BindGroupLayout, mut ai_material: russimp::material::Material, folder: &Path) -> Result<Material> {
-        let diffuse_textures = ai_material.textures.remove(&TextureType::Diffuse).unwrap();
-        let first_diffuse_texture = diffuse_textures.first().unwrap();
-
-        let texture = Model::create_texture(device, queue, &first_diffuse_texture, folder)?;
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
-                },
-            ],
-            label: None,
-        });
-
-        Ok(Material {
-            diffuse_texture: texture,
-            name: "New material".to_string(),
-            bind_group,
-        })
-    }
-
-    fn create_texture(device: &Device, queue: &Queue, ai_texture: &russimp::texture::Texture, folder: &Path) -> Result<Texture> {
-        /*let data = ai_texture.data.as_ref().expect("Texture holds no data!");
-        let bytes = match data {
-            DataContent::Texel(texels) =>
-                texels.iter().flat_map(|t| [t.r, t.g, t.b, t.a])
-                    .collect::<Vec<_>>(),
-            DataContent::Bytes(bytes) => bytes.to_vec() // TODO: This will copy the vec. Rewrite to avoid
-        };
-
-        Texture::from_pixels(device, queue, &bytes, ai_texture.width, ai_texture.height, None)*/
-        Texture::load(device, queue, folder.join(&ai_texture.path))
+            num_elements,
+            material
+        }
     }
 }
 
@@ -224,3 +124,16 @@ where 'b: 'a{
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 }
+
+pub trait ModelLoader {
+    fn load(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layout: &wgpu::BindGroupLayout,
+        path: &Path,
+    ) -> Result<Model>;
+
+    fn can_handle_extension(&self, path: &Path) -> bool;
+}
+
