@@ -11,6 +11,7 @@ use russimp::texture::{DataContent, TextureType};
 use russimp::Vector3D;
 use wgpu::{Device, Queue};
 use wgpu::util::DeviceExt;
+use crate::content_loader::LoadError;
 use crate::texture::Texture;
 
 pub trait Vertex {
@@ -132,7 +133,7 @@ pub trait ModelLoader {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
         path: &Path,
-    ) -> Result<Model>;
+    ) -> Result<Model, LoadError>;
 
     fn can_handle_extension(&self, path: &Path) -> bool;
 }

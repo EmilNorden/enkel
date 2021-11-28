@@ -4,16 +4,14 @@ use russimp::scene::PostProcess;
 use russimp::texture::TextureType;
 use wgpu::{BindGroupLayout, Device, Queue};
 use wgpu::util::DeviceExt;
+use crate::content_loader::LoadError;
 use crate::model::{Material, Mesh, Model, ModelLoader, ModelVertex};
 use crate::texture::Texture;
 
-pub struct AssimpModelLoader {
-
-}
+pub struct AssimpModelLoader {}
 
 impl AssimpModelLoader {
-    fn create_mesh(device: &Device, ai_mesh: russimp::mesh::Mesh) -> Result<Mesh> {
-
+    fn create_mesh(device: &Device, ai_mesh: russimp::mesh::Mesh) -> Result<Mesh, LoadError> {
         let texture_coords = ai_mesh.texture_coords[0].as_ref().unwrap();
 
         let mut vertices = Vec::with_capacity(ai_mesh.vertices.len());
@@ -52,11 +50,17 @@ impl AssimpModelLoader {
         Ok(Mesh::new(ai_mesh.name, vertex_buffer, index_buffer, ai_mesh.faces.len() as u32 * 3, ai_mesh.material_index as usize))
     }
 
-    fn create_material(device: &Device, queue: &Queue, layout: &wgpu::BindGroupLayout, mut ai_material: russimp::material::Material, folder: &Path) -> Result<Material> {
+    fn create_material(
+        device: &Device,
+        queue: &Queue,
+        layout: &wgpu::BindGroupLayout,
+        mut ai_material: russimp::material::Material,
+        folder: &Path) -> Result<Material, LoadError> {
         let diffuse_textures = ai_material.textures.remove(&TextureType::Diffuse).unwrap();
         let first_diffuse_texture = diffuse_textures.first().unwrap();
 
-        let texture = Self::create_texture(device, queue, &first_diffuse_texture, folder)?;
+        let texture = Texture::load(device, queue, folder.join(&first_diffuse_texture.path))
+            .map_err(|e| LoadError::UnableToReadFile)?;
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout,
@@ -75,14 +79,10 @@ impl AssimpModelLoader {
 
         Ok(Material::new("New material".to_string(), texture, bind_group))
     }
-
-    fn create_texture(device: &Device, queue: &Queue, ai_texture: &russimp::texture::Texture, folder: &Path) -> Result<Texture> {
-        Texture::load(device, queue, folder.join(&ai_texture.path))
-    }
 }
 
 impl ModelLoader for AssimpModelLoader {
-    fn load(&self, device: &Device, queue: &Queue, layout: &BindGroupLayout, path: &Path) -> anyhow::Result<Model> {
+    fn load(&self, device: &Device, queue: &Queue, layout: &BindGroupLayout, path: &Path) -> Result<Model, LoadError> {
         /*let scene = russimp::scene::Scene::from_file(path.as_ref().to_str().unwrap(), vec![
 
             PostProcess::CalculateTangentSpace, PostProcess::Triangulate,
@@ -101,11 +101,11 @@ impl ModelLoader for AssimpModelLoader {
 
         let parent_folder = path
             .parent()
-            .context("Directory has no parent")?;
+            .ok_or(LoadError::OtherError("Could not find parent folder for file.".to_string()))?;
 
         let mut materials = Vec::new();
-        for (i, mat) in scene.materials.into_iter().enumerate(){
-            materials.push(Self::create_material(device, queue, layout,mat, parent_folder)?);
+        for (i, mat) in scene.materials.into_iter().enumerate() {
+            materials.push(Self::create_material(device, queue, layout, mat, parent_folder)?);
         }
 
         let mut meshes = Vec::new();
@@ -115,7 +115,7 @@ impl ModelLoader for AssimpModelLoader {
 
         Ok(Model {
             meshes,
-            materials
+            materials,
         })
     }
 

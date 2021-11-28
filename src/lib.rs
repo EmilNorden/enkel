@@ -661,6 +661,8 @@ impl GameHost {
         let window = WindowBuilder::new().build(&event_loop).unwrap();
         let mut state = pollster::block_on(State::new(&window));
 
+        
+
         game.load_content(&mut self.context);
 
         let game_timer = Instant::now();

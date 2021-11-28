@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::model::{Model, ModelLoader};
 use anyhow::{Context, Result};
 use wgpu::{BindGroupLayout, Device, Queue};
+use thiserror::Error;
 
 struct ContentLoader<'a> {
     base_path: Box<Path>,
@@ -13,11 +14,18 @@ struct ContentLoader<'a> {
     layout: &'a BindGroupLayout,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum LoadError {
-    UnknownFileFormat
+    #[error("File does not exist")]
+    FileDoesNotExist,
+    #[error("Unknown file format")]
+    UnknownFileFormat,
+    #[error("Unable to read file")]
+    UnableToReadFile,
+    #[error("Another error occurred loading the file: {0}")]
+    OtherError(String)
 }
-
+/*
 impl Display for LoadError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -25,8 +33,8 @@ impl Display for LoadError {
         }
     }
 }
-
-impl Error for LoadError {}
+*/
+// impl Error for LoadError {}
 
 impl<'a> ContentLoader<'a> {
     pub fn new(base_path: Box<Path>, device: &'a Device, queue: &'a Queue, layout: &'a BindGroupLayout) -> Self {
@@ -44,16 +52,13 @@ impl<'a> ContentLoader<'a> {
     }
 
     pub fn load_model<P: AsRef<Path>>(&self, path: P) -> Result<Model, LoadError> {
-        /*for loader in &self.model_loaders {
-            if loader.can_handle_extension(path) {
-                return loader
-            }
-        }*/
+        if !path.as_ref().exists() {
+            return Err(LoadError::FileDoesNotExist);
+        }
 
-        unimplemented!()
-        /*match self.model_loaders.iter().find(|x| x.can_handle_extension(path.as_ref())) {
+        match self.model_loaders.iter().find(|x| x.can_handle_extension(path.as_ref())) {
             Some(loader) => loader.load(self.device, self.queue, self.layout, path.as_ref()),
             None => Err(LoadError::UnknownFileFormat)
-        }*/
+        }
     }
 }
