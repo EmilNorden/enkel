@@ -14,13 +14,13 @@ use wgpu::util::DeviceExt;
 use crate::content_loader::LoadError;
 use crate::texture::Texture;
 
-pub trait Vertex {
+pub(crate) trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ModelVertex {
+pub(crate) struct ModelVertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
     normal: [f32; 3],

@@ -6,14 +6,6 @@ use anyhow::{Context, Result};
 use wgpu::{BindGroupLayout, Device, Queue};
 use thiserror::Error;
 
-struct ContentLoader<'a> {
-    base_path: Box<Path>,
-    model_loaders: Vec<Box<dyn ModelLoader>>,
-    device: &'a Device,
-    queue: &'a Queue,
-    layout: &'a BindGroupLayout,
-}
-
 #[derive(Error, Debug)]
 pub enum LoadError {
     #[error("File does not exist")]
@@ -25,16 +17,14 @@ pub enum LoadError {
     #[error("Another error occurred loading the file: {0}")]
     OtherError(String)
 }
-/*
-impl Display for LoadError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoadError::UnknownFileFormat => write!(f, "Unknown file format"),
-        }
-    }
+
+pub struct ContentLoader<'a> {
+    base_path: Box<Path>,
+    model_loaders: Vec<Box<dyn ModelLoader>>,
+    device: &'a Device,
+    queue: &'a Queue,
+    layout: &'a BindGroupLayout,
 }
-*/
-// impl Error for LoadError {}
 
 impl<'a> ContentLoader<'a> {
     pub fn new(base_path: Box<Path>, device: &'a Device, queue: &'a Queue, layout: &'a BindGroupLayout) -> Self {

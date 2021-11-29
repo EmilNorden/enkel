@@ -1,10 +1,11 @@
 pub mod game_time;
 mod content_loader;
-mod graphics;
 mod texture;
-mod model;
+pub mod model;
+mod graphics_context;
+mod types;
+pub mod game;
 
-use crate::graphics::GraphicsContext;
 use std::path::{Path, PathBuf};
 use crate::game_time::GameTime;
 use std::time::Instant;
@@ -14,6 +15,10 @@ use winit::event::{Event, WindowEvent, ElementState, VirtualKeyCode, KeyboardInp
 use wgpu::util::DeviceExt;
 use crate::texture::Texture;
 use cgmath::{Rotation3, Zero, InnerSpace};
+use wgpu::BindGroupLayout;
+use winit::platform::run_return::EventLoopExtRunReturn;
+use crate::content_loader::ContentLoader;
+use crate::game::Game;
 use crate::model::{Model, Vertex};
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
@@ -59,7 +64,7 @@ impl InstanceRaw {
                     shader_location: 8,
                     format: wgpu::VertexFormat::Float32x4,
                 },
-            ]
+            ],
         }
     }
 }
@@ -108,6 +113,7 @@ struct State {
     swap_chain: wgpu::SwapChain,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
+    texture_bind_group_layout: BindGroupLayout,
     // model: Model,
     /*vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -381,7 +387,7 @@ impl State {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: uniform_buffer.as_entire_binding()
+                    resource: uniform_buffer.as_entire_binding(),
                 }
             ],
             label: Some("uniform_bind_group"),
@@ -395,7 +401,6 @@ impl State {
                 bind_group_layouts: &[
                     &texture_bind_group_layout,
                     &uniform_bind_group_layout,
-
                 ],
                 push_constant_ranges: &[],
             });
@@ -481,7 +486,7 @@ impl State {
 
                 Instance {
                     position,
-                    rotation
+                    rotation,
                 }
             })
         }).collect::<Vec<_>>();
@@ -505,6 +510,7 @@ impl State {
             swap_chain,
             size,
             render_pipeline,
+            texture_bind_group_layout,
             //model,
             /*vertex_buffer,
             num_vertices,
@@ -519,7 +525,7 @@ impl State {
             camera_controller,
             instances,
             instance_buffer,
-            depth_texture
+            depth_texture,
         }
     }
 
@@ -598,26 +604,37 @@ impl State {
     }
 }
 
-pub trait Game {
-    fn load_content(&mut self, context: &mut GameContext);
-    fn update(&mut self, context: &mut GameContext, time: GameTime);
-    fn draw(&self, context: &mut GameContext, time: GameTime);
-}
-
-pub struct GameContext {
+pub struct GameContext<'a> {
     name: String,
+    content_loader: ContentLoader<'a>,
 }
 
-impl GameContext {
-    pub(crate) fn create<P: AsRef<Path>>(name: &str, base_content_path: P) -> Result<Self, String> {
+impl<'a> GameContext<'a> {
+    pub(crate) fn create(
+        name: &str,
+        base_content_path: Box<Path>,
+        device: &'a wgpu::Device,
+        queue: &'a wgpu::Queue,
+        texture_bind_group_layout: &'a wgpu::BindGroupLayout)
+        -> Result<Self, String> {
+        let content_loader = ContentLoader::new(
+            base_content_path,
+            device,
+            queue,
+            texture_bind_group_layout,
+        );
         Ok(GameContext {
             name: name.to_owned(),
+            content_loader,
         })
     }
 }
 
 pub struct GameHost {
-    context: GameContext,
+    event_loop: EventLoop<()>,
+    window: Window,
+    state: State,
+    base_path: Box<Path>,
 }
 
 pub struct GameHostBuilder {
@@ -646,29 +663,47 @@ impl GameHostBuilder {
     }
 
     pub fn build(&self) -> Result<GameHost, String> {
-        let context = GameContext::create(&self.game_name, self.base_content_path.as_path())?;
+        let event_loop = EventLoop::new();
+        let window = Window::new(&event_loop).unwrap();
+        let state = pollster::block_on(State::new(&window));
 
         Ok(GameHost {
-            context,
+            base_path: Box::from(self.base_content_path.as_path()),
+            event_loop,
+            window,
+            state,
         })
     }
 }
 
 
 impl GameHost {
-    pub fn run<G: Game>(&mut self, mut game: G) {
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new().build(&event_loop).unwrap();
-        let mut state = pollster::block_on(State::new(&window));
+    pub fn run<G: Game>(mut self, mut game: G) {
+        let window = self.window;
+        let mut state = self.state;
 
-        
 
-        game.load_content(&mut self.context);
+        /*let content_loader = ContentLoader::new(
+            self.base_path,
+            &state.device,
+            &state.queue,
+            &state.texture_bind_group_layout
+        );*/
+
+        let context = GameContext::create(
+            "My_name",
+            self.base_path,
+            &state.device,
+            &state.queue,
+            &state.texture_bind_group_layout,
+        ).unwrap();
+
+        // game.load_content(&mut self.context);
 
         let game_timer = Instant::now();
         let mut frame_timer = Instant::now();
         'game_loop: loop {
-            event_loop.run(move |event, _, control_flow| {
+            self.event_loop.run(move |event, _, control_flow| {
                 *control_flow = ControlFlow::Poll;
 
 
