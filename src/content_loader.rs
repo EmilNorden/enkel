@@ -5,6 +5,7 @@ use crate::model::{Model, ModelLoader};
 use anyhow::{Context, Result};
 use wgpu::{BindGroupLayout, Device, Queue};
 use thiserror::Error;
+use crate::model::assimp_loader::AssimpModelLoader;
 
 #[derive(Error, Debug)]
 pub enum LoadError {
@@ -27,10 +28,15 @@ pub struct ContentLoader<'a> {
 }
 
 impl<'a> ContentLoader<'a> {
-    pub fn new(base_path: Box<Path>, device: &'a Device, queue: &'a Queue, layout: &'a BindGroupLayout) -> Self {
+    pub fn new_with_defaults(base_path: Box<Path>, device: &'a Device, queue: &'a Queue, layout: &'a BindGroupLayout) -> Self {
+
+        let model_loaders: Vec<Box<dyn ModelLoader>> = vec![
+            Box::from(AssimpModelLoader::new())
+        ];
+
         ContentLoader {
             base_path,
-            model_loaders: Vec::new(),
+            model_loaders,
             device,
             queue,
             layout,
@@ -42,12 +48,13 @@ impl<'a> ContentLoader<'a> {
     }
 
     pub fn load_model<P: AsRef<Path>>(&self, path: P) -> Result<Model, LoadError> {
-        if !path.as_ref().exists() {
+        let absolute_path = self.base_path.join(path);
+        if !absolute_path.exists() {
             return Err(LoadError::FileDoesNotExist);
         }
 
-        match self.model_loaders.iter().find(|x| x.can_handle_extension(path.as_ref())) {
-            Some(loader) => loader.load(self.device, self.queue, self.layout, path.as_ref()),
+        match self.model_loaders.iter().find(|x| x.can_handle_extension(absolute_path.as_path())) {
+            Some(loader) => loader.load(self.device, self.queue, self.layout, absolute_path.as_path()),
             None => Err(LoadError::UnknownFileFormat)
         }
     }

@@ -11,6 +11,7 @@ use crate::texture::Texture;
 pub struct AssimpModelLoader {}
 
 impl AssimpModelLoader {
+    pub fn new() -> Self { Self{} }
     fn create_mesh(device: &Device, ai_mesh: russimp::mesh::Mesh) -> Result<Mesh, LoadError> {
         let texture_coords = ai_mesh.texture_coords[0].as_ref().unwrap();
 

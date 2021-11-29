@@ -1,4 +1,4 @@
-mod assimp_loader;
+pub(crate) mod assimp_loader;
 
 use std::collections::HashMap;
 use std::ops::Range;

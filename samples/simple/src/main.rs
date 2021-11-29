@@ -1,5 +1,5 @@
-use enkel::{GameContext, GameHostBuilder};
-use enkel::game::Game;
+use enkel::{GameHostBuilder};
+use enkel::game::{Game, GameContext};
 use std::mem::size_of;
 use std::time::{Duration, Instant};
 use std::ops::Rem;
@@ -7,18 +7,17 @@ use std::rc::Rc;
 use enkel::game_time::GameTime;
 
 pub struct MyGame{
-    apple: Option<enkel::model::Model>,
-}
-
-impl MyGame {
-    pub fn new() -> Self {
-        MyGame {
-            apple: None,
-        }
-    }
+    apple: enkel::model::Model,
 }
 
 impl Game for MyGame {
+    fn new(context: &GameContext) -> Self {
+        let apple = context.content().load_model("apple/apple.obj").unwrap();
+        MyGame {
+            apple,
+        }
+    }
+
     fn load_content(&mut self, context: &mut GameContext) {
     }
 
@@ -40,11 +39,10 @@ impl Game for MyGame {
 
 fn main() {
     env_logger::init();
-    let game = MyGame::new();
     GameHostBuilder::new()
-        .with_content_path("/Users/emilnorden")
+        .with_content_path("/Users/emilnorden/models")
         .with_name("Test game")
         .build()
         .unwrap()
-        .run::<MyGame>(game);
+        .run::<MyGame>();
 }

@@ -5,6 +5,7 @@ pub mod model;
 mod graphics_context;
 mod types;
 pub mod game;
+mod renderer;
 
 use std::path::{Path, PathBuf};
 use crate::game_time::GameTime;
@@ -18,7 +19,7 @@ use cgmath::{Rotation3, Zero, InnerSpace};
 use wgpu::BindGroupLayout;
 use winit::platform::run_return::EventLoopExtRunReturn;
 use crate::content_loader::ContentLoader;
-use crate::game::Game;
+use crate::game::{Game, GameContext};
 use crate::model::{Model, Vertex};
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
@@ -604,32 +605,6 @@ impl State {
     }
 }
 
-pub struct GameContext<'a> {
-    name: String,
-    content_loader: ContentLoader<'a>,
-}
-
-impl<'a> GameContext<'a> {
-    pub(crate) fn create(
-        name: &str,
-        base_content_path: Box<Path>,
-        device: &'a wgpu::Device,
-        queue: &'a wgpu::Queue,
-        texture_bind_group_layout: &'a wgpu::BindGroupLayout)
-        -> Result<Self, String> {
-        let content_loader = ContentLoader::new(
-            base_content_path,
-            device,
-            queue,
-            texture_bind_group_layout,
-        );
-        Ok(GameContext {
-            name: name.to_owned(),
-            content_loader,
-        })
-    }
-}
-
 pub struct GameHost {
     event_loop: EventLoop<()>,
     window: Window,
@@ -678,7 +653,7 @@ impl GameHostBuilder {
 
 
 impl GameHost {
-    pub fn run<G: Game>(mut self, mut game: G) {
+    pub fn run<G: Game>(mut self) {
         let window = self.window;
         let mut state = self.state;
 
@@ -698,7 +673,7 @@ impl GameHost {
             &state.texture_bind_group_layout,
         ).unwrap();
 
-        // game.load_content(&mut self.context);
+        let mut game = G::new(&context);
 
         let game_timer = Instant::now();
         let mut frame_timer = Instant::now();
