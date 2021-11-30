@@ -102,7 +102,7 @@ impl Mesh {
         }
     }
 }
-
+/*
 pub trait DrawModel<'a> {
     fn draw_mesh(&mut self, mesh: &'a Mesh, material: &'a Material);
     fn draw_mesh_instanced(
@@ -125,7 +125,7 @@ where 'b: 'a{
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 }
-
+*/
 pub trait ModelLoader {
     fn load(
         &self,

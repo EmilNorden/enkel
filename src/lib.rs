@@ -5,7 +5,7 @@ pub mod model;
 mod graphics_context;
 mod types;
 pub mod game;
-mod renderer;
+pub mod renderer;
 
 use std::path::{Path, PathBuf};
 use crate::game_time::GameTime;
@@ -16,7 +16,7 @@ use winit::event::{Event, WindowEvent, ElementState, VirtualKeyCode, KeyboardInp
 use wgpu::util::DeviceExt;
 use crate::texture::Texture;
 use cgmath::{Rotation3, Zero, InnerSpace};
-use wgpu::BindGroupLayout;
+use wgpu::{BindGroupLayout, CommandEncoder, RenderPass, SwapChainTexture};
 use winit::platform::run_return::EventLoopExtRunReturn;
 use crate::content_loader::ContentLoader;
 use crate::game::{Game, GameContext};
@@ -548,6 +548,57 @@ impl State {
         self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[self.uniforms]));
     }
 
+    fn create_encoder(&self) -> CommandEncoder {
+        self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("enkel render encoder")
+        })
+    }
+
+    fn begin_render<'a, 'b>(&'b self, encoder: &'a mut CommandEncoder, target_texture: &'a SwapChainTexture) -> Result<RenderPass<'a>, wgpu::SwapChainError>
+        where 'b: 'a {
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[
+                wgpu::RenderPassColorAttachment {
+                    view: &target_texture.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                }
+            ],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
+
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+        //render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+        // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
+
+        Ok(render_pass)
+    }
+
+    fn end_render(&self, encoder: CommandEncoder) {
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
     fn render(&mut self) -> Result<(), wgpu::SwapChainError> {
         let frame = self
             .swap_chain
@@ -594,7 +645,6 @@ impl State {
             // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
 
-            use model::DrawModel;
             // let mesh = &self.model.meshes[0];
             // let material = &self.model.materials[mesh.material];
             // render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32);
@@ -602,133 +652,6 @@ impl State {
         self.queue.submit(std::iter::once(encoder.finish()));
 
         Ok(())
-    }
-}
-
-pub struct GameHost {
-    event_loop: EventLoop<()>,
-    window: Window,
-    state: State,
-    base_path: Box<Path>,
-}
-
-pub struct GameHostBuilder {
-    base_content_path: PathBuf,
-    game_name: String,
-}
-
-
-impl GameHostBuilder {
-    pub fn new() -> Self {
-        GameHostBuilder
-        {
-            base_content_path: "/".parse().unwrap(),
-            game_name: "My Game!".to_string(),
-        }
-    }
-
-    pub fn with_name(&mut self, name: &str) -> &mut Self {
-        self.game_name = name.to_owned();
-        self
-    }
-
-    pub fn with_content_path<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
-        self.base_content_path = path.as_ref().into();
-        self
-    }
-
-    pub fn build(&self) -> Result<GameHost, String> {
-        let event_loop = EventLoop::new();
-        let window = Window::new(&event_loop).unwrap();
-        let state = pollster::block_on(State::new(&window));
-
-        Ok(GameHost {
-            base_path: Box::from(self.base_content_path.as_path()),
-            event_loop,
-            window,
-            state,
-        })
-    }
-}
-
-
-impl GameHost {
-    pub fn run<G: Game>(mut self) {
-        let window = self.window;
-        let mut state = self.state;
-
-
-        /*let content_loader = ContentLoader::new(
-            self.base_path,
-            &state.device,
-            &state.queue,
-            &state.texture_bind_group_layout
-        );*/
-
-        let context = GameContext::create(
-            "My_name",
-            self.base_path,
-            &state.device,
-            &state.queue,
-            &state.texture_bind_group_layout,
-        ).unwrap();
-
-        let mut game = G::new(&context);
-
-        let game_timer = Instant::now();
-        let mut frame_timer = Instant::now();
-        'game_loop: loop {
-            self.event_loop.run(move |event, _, control_flow| {
-                *control_flow = ControlFlow::Poll;
-
-
-                match event {
-                    Event::RedrawRequested(_) => {
-                        state.update();
-                        match state.render() {
-                            Ok(_) => {}
-                            Err(wgpu::SwapChainError::Lost) => state.resize(state.size),
-                            Err(wgpu::SwapChainError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                            Err(e) => eprintln!("{:?}", e),
-                        }
-                    }
-                    Event::MainEventsCleared => {
-                        window.request_redraw();
-                    }
-                    Event::WindowEvent {
-                        ref event,
-                        window_id
-                    } if window_id == window.id() => if !state.input(event) {
-                        match event {
-                            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                            WindowEvent::Resized(physical_size) => {
-                                state.resize(*physical_size);
-                            }
-                            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                                state.resize(**new_inner_size);
-                            }
-                            WindowEvent::KeyboardInput {
-                                input, ..
-                            } => {
-                                match input {
-                                    KeyboardInput {
-                                        state: ElementState::Pressed,
-                                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                                        ..
-                                    } => *control_flow = ControlFlow::Exit,
-                                    _ => {}
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
-                }
-            });
-
-            let game_time = GameTime::new(game_timer.elapsed(), frame_timer.elapsed());
-            frame_timer = Instant::now();
-        }
     }
 }
 
