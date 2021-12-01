@@ -19,9 +19,9 @@ impl Game for MyGame {
         }
     }
 
-    fn load_content(&mut self, context: &mut GameContext) {}
+    fn load_content(&mut self, _: &mut GameContext) {}
 
-    fn update(&mut self, context: &mut GameContext, time: GameTime) {
+    fn update(&mut self, _: &mut GameContext, time: GameTime) {
         if time.game_duration().as_secs().rem(2) == 1 {
             // context.graphics_mut().set_clear_color(glm::vec3(1.0, 0.0, 0.0));
         } else {

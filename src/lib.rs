@@ -120,8 +120,6 @@ struct State {
     index_buffer: wgpu::Buffer,
     num_vertices: u32,
     num_indices: u32,*/
-    diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: texture::Texture,
     camera: Camera,
     uniforms: Uniforms,
     uniform_buffer: wgpu::Buffer,
@@ -291,9 +289,6 @@ impl State {
 
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-        let diffuse_bytes = include_bytes!("happy-tree.png");
-        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
-
         let texture_bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -320,24 +315,6 @@ impl State {
                 label: Some("texture_bind_group_layout"),
             }
         );
-
-        let diffuse_bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    }
-                ],
-                label: Some("diffuse_bind_group"),
-            }
-        );
-
 
         let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -517,8 +494,6 @@ impl State {
             num_vertices,
             index_buffer,
             num_indices,*/
-            diffuse_bind_group,
-            diffuse_texture,
             camera,
             uniforms,
             uniform_buffer,
@@ -585,7 +560,7 @@ impl State {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+        // render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
         render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
         //render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
@@ -638,7 +613,7 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            // render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
             //render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
