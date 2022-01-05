@@ -84,7 +84,7 @@ impl Texture {
         img: &image::DynamicImage,
         label: Option<&str>,
     ) -> Result<Self> {
-        let rgba = img.to_rgba8();
+        let rgba = img.flipv().to_rgba8();
         let dimensions = img.dimensions();
 
         let size = wgpu::Extent3d {

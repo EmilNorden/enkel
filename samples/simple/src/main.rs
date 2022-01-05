@@ -7,6 +7,7 @@ use enkel::game_time::GameTime;
 use enkel::model::Material;
 use enkel::renderer::Renderer;
 
+
 pub struct MyGame {
     apple: enkel::model::Model,
 }
@@ -30,9 +31,7 @@ impl Game for MyGame {
     }
 
     fn draw<'a, 'b>(&'a self, renderer: &'b mut (dyn Renderer<'a> + 'b)){
-        let mesh = &self.apple.meshes[0];
-        let material = &self.apple.materials[mesh.material];
-        renderer.draw_mesh(mesh, material);
+        renderer.draw_model_instanced(&self.apple, 0..1);
     }
 }
 

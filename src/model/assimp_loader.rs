@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use russimp::scene::PostProcess;
 use russimp::texture::TextureType;
@@ -11,7 +11,7 @@ use crate::texture::Texture;
 pub struct AssimpModelLoader {}
 
 impl AssimpModelLoader {
-    pub fn new() -> Self { Self{} }
+    pub fn new() -> Self { Self {} }
     fn create_mesh(device: &Device, ai_mesh: russimp::mesh::Mesh) -> Result<Mesh, LoadError> {
         let texture_coords = ai_mesh.texture_coords[0].as_ref().unwrap();
 
@@ -51,17 +51,35 @@ impl AssimpModelLoader {
         Ok(Mesh::new(ai_mesh.name, vertex_buffer, index_buffer, ai_mesh.faces.len() as u32 * 3, ai_mesh.material_index as usize))
     }
 
+    fn load_diffuse_texture(
+        device: &Device,
+        queue: &Queue,
+        folder: &Path,
+        mut ai_material: russimp::material::Material) -> Result<Texture, LoadError> {
+
+        let path = ai_material.textures.remove(&TextureType::Diffuse)
+            .unwrap_or(Vec::new())
+            .first()
+            .map(|x| folder.join(&x.path))
+            .unwrap_or(PathBuf::from("/Users/emilnorden/models/walnut/dioDiffuseMap.png".to_string()));
+
+        let texture = Texture::load(device, queue, folder.join(&path))
+            .map_err(|e| LoadError::UnableToReadFile)?;
+
+        Ok(texture)
+    }
+
     fn create_material(
         device: &Device,
         queue: &Queue,
         layout: &wgpu::BindGroupLayout,
         mut ai_material: russimp::material::Material,
         folder: &Path) -> Result<Material, LoadError> {
-        let diffuse_textures = ai_material.textures.remove(&TextureType::Diffuse).unwrap();
-        let first_diffuse_texture = diffuse_textures.first().unwrap();
-
-        let texture = Texture::load(device, queue, folder.join(&first_diffuse_texture.path))
-            .map_err(|e| LoadError::UnableToReadFile)?;
+        let texture = Self::load_diffuse_texture(
+            device,
+            queue,
+            folder,
+            ai_material)?;
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout,
@@ -97,8 +115,9 @@ impl ModelLoader for AssimpModelLoader {
         let scene = russimp::scene::Scene::from_file(path.to_str().unwrap(), vec![
             PostProcess::RemoveRedundantMaterials,
             PostProcess::CalculateTangentSpace, PostProcess::Triangulate,
-            PostProcess::FindInstances, PostProcess::GenerateUVCoords, PostProcess::SortByPrimitiveType,
+            PostProcess::FindInstances, PostProcess::SortByPrimitiveType,
         ]).expect("Unable to read file");
+        // , PostProcess::GenerateUVCoords,
 
         let parent_folder = path
             .parent()

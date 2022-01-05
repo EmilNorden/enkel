@@ -6,6 +6,8 @@ mod graphics_context;
 mod types;
 pub mod game;
 pub mod renderer;
+mod render_pipeline;
+mod shader;
 
 use std::path::{Path, PathBuf};
 use crate::game_time::GameTime;
@@ -22,7 +24,7 @@ use crate::content_loader::ContentLoader;
 use crate::game::{Game, GameContext};
 use crate::model::{Model, Vertex};
 
-const NUM_INSTANCES_PER_ROW: u32 = 10;
+const NUM_INSTANCES_PER_ROW: u32 = 1;
 const NUM_INSTANCES: u32 = NUM_INSTANCES_PER_ROW * NUM_INSTANCES_PER_ROW;
 const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(NUM_INSTANCES_PER_ROW as f32 * 0.5, 0.0, NUM_INSTANCES_PER_ROW as f32 * 0.5);
 
@@ -429,6 +431,8 @@ impl State {
             },
         });
 
+
+
         /*let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
@@ -449,12 +453,12 @@ impl State {
 */
         let camera_controller = CameraController::new(0.2);
 
-        const SPACE_BETWEEN: f32 = 3.0;
+        const SPACE_BETWEEN: f32 = 1.0;
         let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
             (0..NUM_INSTANCES_PER_ROW).map(move |x| {
                 let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
                 let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-                let position = cgmath::Vector3 { x, y: 0.0, z };
+                let position = cgmath::Vector3 { x: 0.0, y: 0.0, z: 0.0 };
 
                 let rotation = if position.is_zero() {
                     cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
