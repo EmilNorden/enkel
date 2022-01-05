@@ -72,7 +72,11 @@ impl GameHostBuilder {
     }
 
     pub fn with_content_path<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
-        self.base_content_path = path.as_ref().into();
+        self.base_content_path = if path.as_ref().is_relative() {
+            std::env::current_dir().unwrap().join(path)
+        } else {
+            path.as_ref().into()
+        };
         self
     }
 

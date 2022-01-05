@@ -38,7 +38,7 @@ impl Game for MyGame {
 fn main() {
     env_logger::init();
     GameHostBuilder::new()
-        .with_content_path("/Users/emilnorden/models")
+        .with_content_path("res")
         .with_name("Test game")
         .build()
         .unwrap()
