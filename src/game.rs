@@ -1,15 +1,17 @@
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::window::Window;
 use crate::content_loader::ContentLoader;
 use crate::game_time::GameTime;
+use crate::input::input_system::InputSystem;
 use crate::renderer::Renderer;
 use crate::State;
 
 pub trait Game {
-    fn new(context: &GameContext) -> Self;
+    fn new(context: &mut GameContext) -> Self;
     fn load_content(&mut self, context: &mut GameContext);
     fn update(&mut self, context: &mut GameContext, time: GameTime);
     fn draw<'a, 'b>(&'a self, renderer: &'b mut (dyn Renderer<'a> + 'b));
@@ -18,6 +20,7 @@ pub trait Game {
 pub struct GameContext<'a> {
     name: String,
     content_loader: ContentLoader<'a>,
+    input_system: InputSystem,
 }
 
 impl<'a> GameContext<'a> {
@@ -35,13 +38,20 @@ impl<'a> GameContext<'a> {
             texture_bind_group_layout,
         );
 
+        let input_system = InputSystem::new();
+
         Ok(GameContext {
             name: name.to_owned(),
             content_loader,
+            input_system,
         })
     }
 
     pub fn content(&self) -> &ContentLoader { &self.content_loader }
+    pub fn input(&mut self) -> &mut InputSystem { &mut self.input_system }
+
+    pub fn update(&self) {
+    }
 }
 
 pub struct GameHost {
@@ -100,6 +110,8 @@ impl GameHost {
         let window = self.window;
         let mut state = self.state;
 
+        let content_loader = ContentLoader::new_with_defaults()
+
         let mut context = GameContext::create(
             "My_name",
             self.base_path,
@@ -108,73 +120,76 @@ impl GameHost {
             &state.texture_bind_group_layout,
         ).unwrap();
 
-        let mut game = G::new(&context);
+        let mut game = G::new(&mut context);
 
         let game_timer = Instant::now();
         let mut frame_timer = Instant::now();
 
-        'game_loop: loop {
-            self.event_loop.run(move |event, _, control_flow| {
-                *control_flow = ControlFlow::Poll;
+
+        self.event_loop.run_return(|event, _, control_flow| {
+            *control_flow = ControlFlow::Poll;
 
 
-                match event {
-                    Event::RedrawRequested(_) => {
-                        state.update();
+            match event {
+                Event::RedrawRequested(_) => {
+                    state.update();
 
-                        let mut encoder = state.create_encoder();
-                        let frame = state.swap_chain
-                            .get_current_frame().unwrap().output;
-                        let mut render_pass = state.begin_render(&mut encoder, &frame).unwrap(); // TODO: Use below match here
+                    let mut encoder = state.create_encoder();
+                    let frame = state.swap_chain
+                        .get_current_frame().unwrap().output;
+                    let mut render_pass = state.begin_render(&mut encoder, &frame).unwrap(); // TODO: Use below match here
 
-                        game.draw(&mut render_pass);
-                        drop(render_pass);
-                        state.end_render(encoder);
+                    game.draw(&mut render_pass);
+                    drop(render_pass);
+                    state.end_render(encoder);
 
-                        // game.draw(&render_pass, &mut context);
-                        /*match state.render() {
-                            Ok(_) => {}
-                            Err(wgpu::SwapChainError::Lost) => state.resize(state.size),
-                            Err(wgpu::SwapChainError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                            Err(e) => eprintln!("{:?}", e),
-                        }*/
-                    }
-                    Event::MainEventsCleared => {
-                        window.request_redraw();
-                    }
-                    Event::WindowEvent {
-                        ref event,
-                        window_id
-                    } if window_id == window.id() => if !state.input(event) {
-                        match event {
-                            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                            WindowEvent::Resized(physical_size) => {
-                                state.resize(*physical_size);
-                            }
-                            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                                state.resize(**new_inner_size);
-                            }
-                            WindowEvent::KeyboardInput {
-                                input, ..
-                            } => {
-                                match input {
-                                    KeyboardInput {
-                                        state: ElementState::Pressed,
-                                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                                        ..
-                                    } => *control_flow = ControlFlow::Exit,
-                                    _ => {}
+                    // game.draw(&render_pass, &mut context);
+                    /*match state.render() {
+                        Ok(_) => {}
+                        Err(wgpu::SwapChainError::Lost) => state.resize(state.size),
+                        Err(wgpu::SwapChainError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                        Err(e) => eprintln!("{:?}", e),
+                    }*/
+                }
+                Event::MainEventsCleared => {
+                    game.update(&mut context, GameTime::new(
+                        Duration::from_secs(0),
+                        Duration::from_secs(0)));
+                    window.request_redraw();
+                }
+                Event::WindowEvent {
+                    ref event,
+                    window_id
+                } if window_id == window.id() => if !state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        WindowEvent::Resized(physical_size) => {
+                            state.resize(*physical_size);
+                        }
+                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                            state.resize(**new_inner_size);
+                        }
+                        WindowEvent::KeyboardInput {
+                            input, ..
+                        } => {
+                            match input {
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Escape),
+                                    ..
+                                } => *control_flow = ControlFlow::Exit,
+                                _ => {
+                                    println!("Key: {}", input.scancode)
                                 }
                             }
-                            _ => {}
                         }
+                        _ => {}
                     }
-                    _ => {}
-                }
-            });
-
-            let game_time = GameTime::new(game_timer.elapsed(), frame_timer.elapsed());
-            frame_timer = Instant::now();
-        }
+                },
+                _ => {}
+            }
+        });
+        let game_time = GameTime::new(game_timer.elapsed(), frame_timer.elapsed());
+        frame_timer = Instant::now();
     }
 }

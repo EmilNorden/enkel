@@ -8,13 +8,14 @@ pub mod game;
 pub mod renderer;
 mod render_pipeline;
 mod shader;
+pub mod input;
 
 use std::path::{Path, PathBuf};
 use crate::game_time::GameTime;
 use std::time::Instant;
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::window::{WindowBuilder, Window};
-use winit::event::{Event, WindowEvent, ElementState, VirtualKeyCode, KeyboardInput};
+use winit::event::{Event, WindowEvent, ElementState, KeyboardInput};
 use wgpu::util::DeviceExt;
 use crate::texture::Texture;
 use cgmath::{Rotation3, Zero, InnerSpace};
@@ -23,6 +24,7 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 use crate::content_loader::ContentLoader;
 use crate::game::{Game, GameContext};
 use crate::model::{Model, Vertex};
+pub use winit::event::VirtualKeyCode;
 
 const NUM_INSTANCES_PER_ROW: u32 = 1;
 const NUM_INSTANCES: u32 = NUM_INSTANCES_PER_ROW * NUM_INSTANCES_PER_ROW;
