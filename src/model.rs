@@ -3,13 +3,13 @@ pub(crate) mod assimp_loader;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::Path;
-use crate::texture;
+use crate::{State, texture};
 use anyhow::*;
 use bytemuck::Pod;
 use russimp::scene::{PostProcess, PostProcessSteps};
 use russimp::texture::{DataContent, TextureType};
 use russimp::Vector3D;
-use wgpu::{Device, Queue};
+use wgpu::{BindGroupLayout, Device, Queue};
 use wgpu::util::DeviceExt;
 use crate::content_loader::LoadError;
 use crate::texture::Texture;
@@ -129,9 +129,9 @@ where 'b: 'a{
 pub trait ModelLoader {
     fn load(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
+        device: &Device,
+        queue: &Queue,
+        layout: &BindGroupLayout,
         path: &Path,
     ) -> Result<Model, LoadError>;
 

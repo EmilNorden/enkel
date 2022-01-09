@@ -15,6 +15,7 @@ anyhow = "1.0.42"
 cgmath = "0.18.0"
 russimp = "1.0.1"
 thiserror = "1.0.30"
+enum-map = "2.0.0-2"
 
 [build-dependencies]
 anyhow = "1.0.45"

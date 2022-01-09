@@ -7,6 +7,8 @@ use winit::window::Window;
 use crate::content_loader::ContentLoader;
 use crate::game_time::GameTime;
 use crate::input::input_system::InputSystem;
+use crate::model::assimp_loader::AssimpModelLoader;
+use crate::model::ModelLoader;
 use crate::renderer::Renderer;
 use crate::State;
 
@@ -17,41 +19,46 @@ pub trait Game {
     fn draw<'a, 'b>(&'a self, renderer: &'b mut (dyn Renderer<'a> + 'b));
 }
 
-pub struct GameContext<'a> {
+pub struct GameContext {
     name: String,
-    content_loader: ContentLoader<'a>,
+    base_path: Box<Path>,
     input_system: InputSystem,
+    device_state: State,
+    model_loaders: Vec<Box<dyn ModelLoader>>,
 }
 
-impl<'a> GameContext<'a> {
+impl GameContext {
     pub(crate) fn create(
         name: &str,
-        base_content_path: Box<Path>,
-        device: &'a wgpu::Device,
-        queue: &'a wgpu::Queue,
-        texture_bind_group_layout: &'a wgpu::BindGroupLayout)
+        base_path: Box<Path>,
+        device_state: State)
         -> Result<Self, String> {
-        let content_loader = ContentLoader::new_with_defaults(
-            base_content_path,
-            device,
-            queue,
-            texture_bind_group_layout,
-        );
-
         let input_system = InputSystem::new();
+        let model_loaders: Vec<Box<dyn ModelLoader>> = vec![
+            Box::from(AssimpModelLoader::new())
+        ];
 
         Ok(GameContext {
             name: name.to_owned(),
-            content_loader,
+            base_path,
             input_system,
+            device_state,
+            model_loaders,
         })
     }
 
-    pub fn content(&self) -> &ContentLoader { &self.content_loader }
     pub fn input(&mut self) -> &mut InputSystem { &mut self.input_system }
 
-    pub fn update(&self) {
+    pub fn content(&self) -> ContentLoader {
+        ContentLoader::new(
+            self.base_path.clone(),
+            &self.model_loaders,
+            &self.device_state.device,
+            &self.device_state.queue,
+            &self.device_state.texture_bind_group_layout)
     }
+
+    pub fn update(&self) {}
 }
 
 pub struct GameHost {
@@ -110,16 +117,11 @@ impl GameHost {
         let window = self.window;
         let mut state = self.state;
 
-        let content_loader = ContentLoader::new_with_defaults()
-
         let mut context = GameContext::create(
             "My_name",
             self.base_path,
-            &state.device,
-            &state.queue,
-            &state.texture_bind_group_layout,
+            state
         ).unwrap();
-
         let mut game = G::new(&mut context);
 
         let game_timer = Instant::now();
@@ -132,16 +134,16 @@ impl GameHost {
 
             match event {
                 Event::RedrawRequested(_) => {
-                    state.update();
+                    context.device_state.update();
 
-                    let mut encoder = state.create_encoder();
-                    let frame = state.swap_chain
+                    let mut encoder = context.device_state.create_encoder();
+                    let frame = context.device_state.swap_chain
                         .get_current_frame().unwrap().output;
-                    let mut render_pass = state.begin_render(&mut encoder, &frame).unwrap(); // TODO: Use below match here
+                    let mut render_pass = context.device_state.begin_render(&mut encoder, &frame).unwrap(); // TODO: Use below match here
 
                     game.draw(&mut render_pass);
                     drop(render_pass);
-                    state.end_render(encoder);
+                    context.device_state.end_render(encoder);
 
                     // game.draw(&render_pass, &mut context);
                     /*match state.render() {
@@ -160,14 +162,14 @@ impl GameHost {
                 Event::WindowEvent {
                     ref event,
                     window_id
-                } if window_id == window.id() => if !state.input(event) {
+                } if window_id == window.id() => if !context.device_state.input(event) {
                     match event {
                         WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                         WindowEvent::Resized(physical_size) => {
-                            state.resize(*physical_size);
+                            context.device_state.resize(*physical_size);
                         }
                         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            state.resize(**new_inner_size);
+                            context.device_state.resize(**new_inner_size);
                         }
                         WindowEvent::KeyboardInput {
                             input, ..
@@ -179,7 +181,16 @@ impl GameHost {
                                     ..
                                 } => *control_flow = ControlFlow::Exit,
                                 _ => {
-                                    println!("Key: {}", input.scancode)
+                                    if let Some(keycode) = input.virtual_keycode {
+                                        if keycode == VirtualKeyCode::U {
+                                            println!("U is pressed!");
+                                        }
+
+                                        match input.state {
+                                            ElementState::Pressed => context.input().on_key_down(keycode.into()),
+                                            ElementState::Released => context.input().on_key_up(keycode.into()),
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -3,11 +3,12 @@ use std::mem::size_of;
 use std::time::{Duration, Instant};
 use std::ops::Rem;
 use std::rc::Rc;
+use enkel::content_loader::ContentLoader;
 use enkel::game_time::GameTime;
 use enkel::input::input_system::{AxisBinding, AxisBindingDefinition, AxisDefinition};
+use enkel::input::keyboard::KeyCode;
 use enkel::model::Material;
 use enkel::renderer::Renderer;
-use enkel::VirtualKeyCode;
 macro_rules! axis_property {
     ($t:ident) => {
         pub fn $t(&self) -> f32 {
@@ -31,8 +32,16 @@ impl Game for MyGame {
     fn new(context: &mut GameContext) -> Self {
         let apple = context.content().load_model("apple/apple.obj").unwrap();
 
-
         context.input().create_axis(AxisDefinition {
+            name: "fmov",
+            bindings: vec![
+                AxisBindingDefinition {
+                    scale: 1.0,
+                    binding: AxisBinding::Keyboard(KeyCode::U),
+                }
+            ]
+        });
+        /*context.input().create_axis(AxisDefinition {
             name: "forward_movement",
             bindings: vec![
                 AxisBindingDefinition {
@@ -40,8 +49,7 @@ impl Game for MyGame {
                     binding: AxisBinding::Keyboard(VirtualKeyCode::U),
                 }
             ],
-        });
-        //context.input().register_axis("hmov");
+        });*/
         MyGame {
             apple,
         }
@@ -50,7 +58,7 @@ impl Game for MyGame {
     fn load_content(&mut self, _: &mut GameContext) {}
 
     fn update(&mut self, ctx: &mut GameContext, time: GameTime) {
-        let c = ctx.input().query_axis("forward_movement").unwrap();
+        let c = ctx.input().query_axis("fmov").unwrap();
         println!("forward_movement: {}", c);
         if time.game_duration().as_secs().rem(2) == 1 {
             // context.graphics_mut().set_clear_color(glm::vec3(1.0, 0.0, 0.0));

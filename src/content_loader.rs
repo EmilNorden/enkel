@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use wgpu::{BindGroupLayout, Device, Queue};
 use thiserror::Error;
 use crate::model::assimp_loader::AssimpModelLoader;
+use crate::State;
 
 #[derive(Error, Debug)]
 pub enum LoadError {
@@ -16,23 +17,27 @@ pub enum LoadError {
     #[error("Unable to read file")]
     UnableToReadFile,
     #[error("Another error occurred loading the file: {0}")]
-    OtherError(String)
+    OtherError(String),
 }
 
 pub struct ContentLoader<'a> {
     base_path: Box<Path>,
-    model_loaders: Vec<Box<dyn ModelLoader>>,
+    model_loaders: &'a Vec<Box<dyn ModelLoader>>,
     device: &'a Device,
     queue: &'a Queue,
     layout: &'a BindGroupLayout,
 }
 
 impl<'a> ContentLoader<'a> {
-    pub fn new_with_defaults(base_path: Box<Path>, device: &'a Device, queue: &'a Queue, layout: &'a BindGroupLayout) -> Self {
-
-        let model_loaders: Vec<Box<dyn ModelLoader>> = vec![
+    pub fn new(
+        base_path: Box<Path>,
+        model_loaders: &'a Vec<Box<dyn ModelLoader>>,
+        device: &'a Device,
+        queue: &'a Queue,
+        layout: &'a BindGroupLayout) -> Self {
+        /*let model_loaders: Vec<Box<dyn ModelLoader>> = vec![
             Box::from(AssimpModelLoader::new())
-        ];
+        ];*/
 
         ContentLoader {
             base_path,
@@ -43,9 +48,9 @@ impl<'a> ContentLoader<'a> {
         }
     }
 
-    pub fn register_model_loader(&mut self, loader: Box<dyn ModelLoader>) {
+    /*pub fn register_model_loader(&mut self, loader: Box<dyn ModelLoader>) {
         self.model_loaders.push(loader);
-    }
+    }*/
 
     pub fn load_model<P: AsRef<Path>>(&self, path: P) -> Result<Model, LoadError> {
         let absolute_path = self.base_path.join(path);

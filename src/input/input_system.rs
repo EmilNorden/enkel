@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use winit::event::VirtualKeyCode;
+use crate::input::keyboard::KeyCode;
 
 pub struct InputSystem {
     axes: HashMap<String, Axis>,
@@ -20,21 +21,36 @@ impl InputSystem {
 
     pub fn query_axis(&self, axis: &str) -> Result<f32, InputError> {
         let axis = self.axes.get(axis).ok_or(InputError::AxisDoesNotExist)?;
-        Ok(axis.current_value)
+        let value = axis.bindings
+            .iter()
+            .filter(|(_, active)| *active)
+            .fold(0.0f32, |val, (binding, _)| val + binding.scale);
+
+        Ok(value)
     }
 
     pub fn create_axis(&mut self, definition: AxisDefinition) {
         self.axes.insert(definition.name.to_string(), Axis {
             current_value: 0.0,
-            bindings: definition.bindings
+            bindings: definition.bindings.into_iter().zip(std::iter::repeat(false)).collect()
         });
     }
 
-    pub(crate) fn on_keyboard_input(&mut self, keycode: VirtualKeyCode) {
+    pub(crate) fn on_key_down(&mut self, keycode: KeyCode) {
         for (_, axis) in &mut self.axes {
-            for binding_def in &axis.bindings {
+            for (binding_def, active) in &mut axis.bindings {
                 if binding_def.binding == AxisBinding::Keyboard(keycode) {
-                    axis.current_value += binding_def.scale;
+                    *active = true;
+                }
+            }
+        }
+    }
+
+    pub(crate) fn on_key_up(&mut self, keycode: KeyCode) {
+        for (_, axis) in &mut self.axes {
+            for (binding_def, active) in &mut axis.bindings {
+                if binding_def.binding == AxisBinding::Keyboard(keycode) {
+                    *active = false;
                 }
             }
         }
@@ -50,11 +66,11 @@ impl InputSystem {
 
 #[derive(PartialEq)]
 pub enum AxisBinding {
-    Keyboard(VirtualKeyCode),
+    Keyboard(KeyCode),
 }
 
 pub struct Axis {
-    bindings: Vec<AxisBindingDefinition>,
+    bindings: Vec<(AxisBindingDefinition, bool)>,
     current_value: f32,
 }
 

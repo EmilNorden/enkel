@@ -6,6 +6,7 @@ use wgpu::{BindGroupLayout, Device, Queue};
 use wgpu::util::DeviceExt;
 use crate::content_loader::LoadError;
 use crate::model::{Material, Mesh, Model, ModelLoader, ModelVertex};
+use crate::State;
 use crate::texture::Texture;
 
 pub struct AssimpModelLoader {}
@@ -56,7 +57,6 @@ impl AssimpModelLoader {
         queue: &Queue,
         folder: &Path,
         mut ai_material: russimp::material::Material) -> Result<Texture, LoadError> {
-
         let path = ai_material.textures.remove(&TextureType::Diffuse)
             .unwrap_or(Vec::new())
             .first()

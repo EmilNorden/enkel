@@ -1,5 +1,5 @@
 pub mod game_time;
-mod content_loader;
+pub mod content_loader;
 mod texture;
 pub mod model;
 mod graphics_context;
@@ -15,7 +15,7 @@ use crate::game_time::GameTime;
 use std::time::Instant;
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::window::{WindowBuilder, Window};
-use winit::event::{Event, WindowEvent, ElementState, KeyboardInput};
+use winit::event::{Event, WindowEvent, ElementState, KeyboardInput, VirtualKeyCode};
 use wgpu::util::DeviceExt;
 use crate::texture::Texture;
 use cgmath::{Rotation3, Zero, InnerSpace};
@@ -24,7 +24,6 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 use crate::content_loader::ContentLoader;
 use crate::game::{Game, GameContext};
 use crate::model::{Model, Vertex};
-pub use winit::event::VirtualKeyCode;
 
 const NUM_INSTANCES_PER_ROW: u32 = 1;
 const NUM_INSTANCES: u32 = NUM_INSTANCES_PER_ROW * NUM_INSTANCES_PER_ROW;
@@ -103,14 +102,7 @@ impl Uniforms {
     }
 }
 
-const INDICES: &[u16] = &[
-    0, 1, 4,
-    1, 2, 4,
-    2, 3, 4,
-    /* padding */ 0,
-];
-
-struct State {
+pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -433,26 +425,6 @@ impl State {
             },
         });
 
-
-
-        /*let vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsage::VERTEX,
-            }
-        );*/
-
-        /*let index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsage::INDEX,
-            }
-        );
-        let num_vertices = VERTICES.len() as u32;
-        let num_indices = INDICES.len() as u32;
-*/
         let camera_controller = CameraController::new(0.2);
 
         const SPACE_BETWEEN: f32 = 1.0;
